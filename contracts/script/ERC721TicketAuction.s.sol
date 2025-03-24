@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
-import {ERC721TicketAuction} from "src/ERC721TicketAuction.sol";
+import {ERC721TicketAuction} from "src/ERC721TicketAuction1.sol";
 
 contract DeployERC721TicketAuction is Script {
     function run() public {

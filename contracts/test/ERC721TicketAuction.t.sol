@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {ERC721TicketAuction} from "src/ERC721TicketAuction1.sol";
+import {ERC721TicketAuction} from "src/ERC721TicketAuction.sol";
 import {ERC721Ticket} from "src/ERC721Ticket.sol";
 import {IERC721TicketAuction} from "src/interfaces/IERC721TicketAuction.sol";
 import {MockNFT} from "./mocks/MockNFT.sol";

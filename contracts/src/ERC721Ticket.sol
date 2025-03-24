@@ -7,7 +7,7 @@ import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProo
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721Ticket} from "src/interfaces/IERC721Ticket.sol";
-import {IERC721TicketErrors} from "src/interfaces/IERC721TicketErrors1.sol";
+import {IERC721TicketErrors} from "src/interfaces/IERC721TicketErrors.sol";
 
 contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErrors {
     SupportedToken[] public supportedTokens;

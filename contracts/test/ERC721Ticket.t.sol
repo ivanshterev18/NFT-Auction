@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {ERC721Ticket} from "src/ERC721Ticket.sol";
 import {MockAggregatorV3} from "./mocks/MockPriceFeed.sol";
-import {IERC721TicketErrors} from "src/interfaces/IERC721TicketErrors1.sol";
+import {IERC721TicketErrors} from "src/interfaces/IERC721TicketErrors.sol";
 import {MockERC20} from "./mocks/MockERC20.sol";
 import {MockAdminWallet} from "./mocks/MockAdminWallet.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";

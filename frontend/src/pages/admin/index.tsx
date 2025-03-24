@@ -125,6 +125,7 @@ const AdminPanel = () => {
   useEffect(() => {
     if (isIpfsLoading || isSetPriceLoading || isAddMintCurrencyLoading) {
       toast.loading("Transaction pending...", { id: "ipfs" });
+      return;
     }
 
     if (isIpfsSuccess) {
@@ -132,22 +133,26 @@ const AdminPanel = () => {
       setWhitelist(whitelistLastState);
       refreshIpfsUploadedData(whitelistLastState);
       toast.success("Whitelist updated! 🎉", { id: "ipfs" });
+      return;
     }
 
     if (isSetPriceSuccess) {
       setNftMintPrice("");
       refetchMintPrice();
       toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
+      return;
     }
 
     if (isAddMintCurrencySuccess) {
       setTokenAddress("");
       setPriceAddress("");
       toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
+      return;
     }
 
     if (isIpfsError || isSetPriceError || isAddMintCurrencyError) {
       toast.error("Transaction failed! ❌", { id: "ipfs" });
+      return;
     }
   }, [
     isIpfsSuccess,
@@ -178,30 +183,28 @@ const AdminPanel = () => {
           </p>
         </div>
 
-        {/* Set NFT Price */}
-        <form onSubmit={handleSetPrice} className="mb-8">
-          <label className="block mb-2 text-lg text-gray-300">
-            Set NFT Price (ETH):
-          </label>
-          <input
-            type="number"
-            value={nftMintPrice}
-            onChange={(e) => setNftMintPrice(e.target.value)}
-            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
-            placeholder="Enter price"
-          />
-          <button
-            type="submit"
-            disabled={!nftMintPrice}
-            className={`mt-4 w-full ${
-              !nftMintPrice
-                ? "bg-gray-500 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-500 cursor-pointer"
-            } text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-md`}
-          >
-            Set Price
-          </button>
-        </form>
+        <label className="block mb-2 text-lg text-gray-300">
+          Set NFT Price (ETH):
+        </label>
+        <input
+          type="number"
+          value={nftMintPrice}
+          onChange={(e) => setNftMintPrice(e.target.value)}
+          className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+          placeholder="Enter price"
+        />
+        <button
+          type="submit"
+          disabled={!nftMintPrice}
+          onClick={handleSetPrice}
+          className={`mt-4 w-full ${
+            !nftMintPrice
+              ? "bg-gray-500 cursor-not-allowed"
+              : "bg-indigo-600 hover:bg-indigo-500 cursor-pointer"
+          } text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-md`}
+        >
+          Set Price
+        </button>
 
         {/* Whitelist Management */}
         <div className="mb-8">
@@ -269,47 +272,46 @@ const AdminPanel = () => {
           <h3 className="text-2xl font-semibold mb-4 text-indigo-400">
             Add Currency:
           </h3>
-          <form onSubmit={handleAddMintCurrency} className="mb-8">
-            <label className="block mb-2 text-lg text-gray-300">Symbol:</label>
-            <input
-              type="text"
-              value={symbol}
-              onChange={(e) => setSymbol(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
-              placeholder="Enter token symbol"
-            />
-            <label className="block mb-2 text-lg text-gray-300  mt-4">
-              Token Address:
-            </label>
-            <input
-              type="text"
-              value={tokenAddress}
-              onChange={(e) => setTokenAddress(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
-              placeholder="Enter token address"
-            />
-            <label className="block mb-2 text-lg text-gray-300 mt-4">
-              Price Feed Address:
-            </label>
-            <input
-              type="text"
-              value={priceAddress}
-              onChange={(e) => setPriceAddress(e.target.value)}
-              className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
-              placeholder="Enter price address"
-            />
-            <button
-              type="submit"
-              disabled={!tokenAddress || !priceAddress}
-              className={`mt-8 w-full ${
-                !tokenAddress || !priceAddress
-                  ? "bg-gray-500 cursor-not-allowed"
-                  : "bg-indigo-600 hover:bg-indigo-500 cursor-pointer"
-              } text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-md`}
-            >
-              Add Currency
-            </button>
-          </form>
+          <label className="block mb-2 text-lg text-gray-300">Symbol:</label>
+          <input
+            type="text"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+            placeholder="Enter token symbol"
+          />
+          <label className="block mb-2 text-lg text-gray-300  mt-4">
+            Token Address:
+          </label>
+          <input
+            type="text"
+            value={tokenAddress}
+            onChange={(e) => setTokenAddress(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+            placeholder="Enter token address"
+          />
+          <label className="block mb-2 text-lg text-gray-300 mt-4">
+            Price Feed Address:
+          </label>
+          <input
+            type="text"
+            value={priceAddress}
+            onChange={(e) => setPriceAddress(e.target.value)}
+            className="w-full p-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-indigo-500 outline-none transition"
+            placeholder="Enter price address"
+          />
+          <button
+            type="submit"
+            onClick={handleAddMintCurrency}
+            disabled={!tokenAddress || !priceAddress}
+            className={`mt-8 w-full ${
+              !tokenAddress || !priceAddress
+                ? "bg-gray-500 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-500 cursor-pointer"
+            } text-white font-semibold py-3 px-6 rounded-lg transition duration-300 shadow-md`}
+          >
+            Add Currency
+          </button>
         </div>
       </div>
     </div>

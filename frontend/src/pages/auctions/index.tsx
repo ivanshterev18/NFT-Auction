@@ -15,11 +15,7 @@ import {
   USDC_CONTRACT_ADDRESS,
   ERC20_CONTRACT_ABI,
 } from "../../utils/constants";
-import {
-  formatPriceInETH,
-  formatPriceInWei,
-  formatTimeDifference,
-} from "../../utils/format";
+import { formatPriceInETH, formatPriceInWei } from "../../utils/format";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
@@ -28,15 +24,17 @@ import { useWeb3Store } from "../../stores/useWeb3Store";
 import { useNFTContract } from "../../hooks/useNFTContract";
 import { useAuctionContract } from "../../hooks/useAuctionContract";
 import { IAuction, SupportedTokens } from "../../utils/types";
+import { TimerComponent } from "../../components/TimerComponent";
 
 export default function Auctions() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const whitelist = useWeb3Store((state) => state.whitelist);
   const [selectedToken, setSelectedToken] = useState<SupportedTokens>({
     symbol: "ETH",
-    address: "",
+    token: "",
   });
+
   const {
     mintPrice,
     isWhitelisted,
@@ -50,7 +48,7 @@ export default function Auctions() {
       fetchIsWhitelisted: true,
       fetchMintPrice: true,
     },
-    selectedToken.address
+    selectedToken.token
   );
 
   const { auctions } = useAuctionContract({
@@ -58,12 +56,12 @@ export default function Auctions() {
   });
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!address) {
       router.push("/");
     }
-  }, [isConnected, router]);
+  }, [address, router]);
 
-  if (!isConnected) {
+  if (!address) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-white">
         <h1 className="text-3xl font-bold">Access Restricted</h1>
@@ -109,7 +107,7 @@ export default function Auctions() {
 
   const handleApprove = () => {
     writeContract({
-      address: selectedToken.address as `0x${string}`,
+      address: selectedToken.token as `0x${string}`,
       abi: ERC20_CONTRACT_ABI,
       functionName: "approve",
       args: [
@@ -126,7 +124,7 @@ export default function Auctions() {
   };
 
   const { data: allowance, refetch: refetchAllowance } = useReadContract({
-    address: selectedToken.address as `0x${string}`,
+    address: selectedToken.token as `0x${string}`,
     abi: ERC20_CONTRACT_ABI,
     functionName: "allowance",
     args: [address, NFT_CONTRACT_ADDRESS],
@@ -135,13 +133,16 @@ export default function Auctions() {
   useEffect(() => {
     if (isLoading) {
       toast.loading("Transaction pending...", { id: "txn" });
+      return;
     }
     if (isSuccess) {
       refetchAllowance();
       toast.success("Transaction confirmed! 🎉", { id: "txn" });
+      return;
     }
     if (isError) {
       toast.error(error?.message || "Transaction failed! ❌", { id: "txn" });
+      return;
     }
   }, [isLoading, isSuccess, isError]);
 
@@ -192,10 +193,10 @@ export default function Auctions() {
                 onChange={(e) => {
                   setSelectedToken({
                     symbol: e.target.value as string,
-                    address: (supportedTokens as SupportedTokens[])?.find(
+                    token: (supportedTokens as SupportedTokens[])?.find(
                       (token: SupportedTokens) =>
                         token.symbol === e.target.value
-                    )?.address as string,
+                    )?.token as string,
                   });
                   refetchMintPriceInToken();
                 }}
@@ -233,7 +234,10 @@ export default function Auctions() {
               />
               <h3 className="text-xl font-bold">{`NFT #${auction.tokenId}`}</h3>
               <p className="text-gray-400">
-                Ends in: {formatTimeDifference(Number(auction.endTime))}
+                Ends in:{" "}
+                {auction?.endTime && (
+                  <TimerComponent endTime={Number(auction?.endTime)} />
+                )}
               </p>
               <p className="text-gray-400">
                 Highest Bid:{" "}

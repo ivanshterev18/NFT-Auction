@@ -74,14 +74,12 @@ export const useNFTContract = (
     : { data: null };
 
   const { data: mintPriceInToken, refetch: refetchMintPriceInToken } =
-    options?.fetchMintPriceInToken && tokenAddress
-      ? useReadContract({
-          address: nftContract.address,
-          abi: nftContract.abi,
-          functionName: "getMintPriceInToken",
-          args: [tokenAddress],
-        })
-      : { data: null, refetch: () => {} };
+    useReadContract({
+      address: nftContract.address,
+      abi: nftContract.abi,
+      functionName: "getMintPriceInToken",
+      args: [tokenAddress],
+    });
 
   const { data: nfts } = options?.fetchNFTsOfOwner
     ? useReadContract({

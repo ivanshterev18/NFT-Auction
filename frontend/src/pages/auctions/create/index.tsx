@@ -16,7 +16,10 @@ import { useNFTContract } from "../../../hooks/useNFTContract";
 
 const CreateAuction = () => {
   const router = useRouter();
-  const { myNftIds, isApproved, refetchIsApproved } = useNFTContract();
+  const { myNftIds, isApproved, refetchIsApproved } = useNFTContract({
+    fetchMyNftIds: true,
+    fetchIsApproved: true,
+  });
   const [selectedNFT, setSelectedNFT] = useState("");
   const [endDate, setEndDate] = useState<string>("");
   const [startingPrice, setStartingPrice] = useState("");
@@ -79,20 +82,24 @@ const CreateAuction = () => {
   useEffect(() => {
     if (isCreateAuctionLoading || isApproveLoading) {
       toast.loading("Transaction pending...", { id: "txn" });
+      return;
     }
 
     if (isApproveSuccess) {
       refetchIsApproved();
       toast.success("Transaction confirmed! 🎉", { id: "txn" });
+      return;
     }
 
     if (isCreateAuctionSuccess) {
       router.push("/auctions");
       toast.success("Transaction confirmed! 🎉", { id: "txn" });
+      return;
     }
 
     if (isCreateAuctionError || isApproveError) {
       toast.error("Transaction failed! ❌", { id: "txn" });
+      return;
     }
   }, [
     isCreateAuctionLoading,

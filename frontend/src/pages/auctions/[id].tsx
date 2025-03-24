@@ -69,18 +69,22 @@ export default function AuctionPage() {
   useEffect(() => {
     if (isBidLoading || isFinalizeLoading) {
       toast.loading("Transaction pending...", { id: "txn" });
+      return;
     }
     if (isBidSuccess) {
       setBidAmount(0);
       refetchAuction();
       toast.success("Transaction successful", { id: "txn" });
+      return;
     }
     if (isFinalizeSuccess) {
       refetchAuction();
       toast.success("Transaction successful", { id: "txn" });
+      return;
     }
     if (isBidError || isFinalizeError) {
       toast.error("Transaction failed", { id: "txn" });
+      return;
     }
   }, [
     isBidSuccess,

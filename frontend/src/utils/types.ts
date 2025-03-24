@@ -12,7 +12,7 @@ export interface IAuction {
 
 export type SupportedTokens = {
   symbol: string;
-  address: string;
+  token: string;
 };
 
 export interface IBid {

@@ -620,6 +620,13 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "withdraw",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "event",
     "name": "Approval",
     "inputs": [
@@ -892,5 +899,36 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InsufficientFunds",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidETHPrice",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotWhitelisted",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PriceFeedNotSet",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TokenTransferFailed",
+    "inputs": []
   }
 ]

@@ -12,6 +12,19 @@
   },
   {
     "type": "function",
+    "name": "CONTRACT_ADDRESS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC721"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "auctionBidders",
     "inputs": [
       {
@@ -168,19 +181,6 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "contractAddress",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IERC721"
       }
     ],
     "stateMutability": "view"
@@ -452,90 +452,38 @@
     "stateMutability": "view"
   },
   {
-    "type": "event",
-    "name": "AuctionCreated",
-    "inputs": [
-      {
-        "name": "auctionId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "seller",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "reservePrice",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "endTime",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "tokenId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
+    "type": "error",
+    "name": "AuctionAlreadyFinalized",
+    "inputs": []
   },
   {
-    "type": "event",
-    "name": "AuctionFinalized",
-    "inputs": [
-      {
-        "name": "auctionId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "winner",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
+    "type": "error",
+    "name": "AuctionHasEnded",
+    "inputs": []
   },
   {
-    "type": "event",
-    "name": "NewBid",
-    "inputs": [
-      {
-        "name": "auctionId",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "bidder",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
+    "type": "error",
+    "name": "BidMustBeHigherThanCurrentHighestBidAndReservePrice",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CannotBidOnOwnAuction",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EndTimeMustBeInTheFuture",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotTheSellerOfThisAuction",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ReservePriceMustBeGreaterThanZero",
+    "inputs": []
   }
 ]

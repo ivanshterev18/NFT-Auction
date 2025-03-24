@@ -1,0 +1,40 @@
+{
+  "name": "my-rainbowkit-app",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@pinata/sdk": "^2.1.0",
+    "@rainbow-me/rainbowkit": "^2.2.4",
+    "@tailwindcss/postcss": "^4.0.12",
+    "@tanstack/react-query": "^5.55.3",
+    "bignumber.js": "^9.1.2",
+    "keccak256": "^1.0.6",
+    "merkletreejs": "^0.5.1",
+    "next": "^15.1.4",
+    "pinata": "^2.1.0",
+    "postcss": "^8.5.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
+    "tailwindcss": "^4.0.12",
+    "viem": "2.23.3",
+    "wagmi": "^2.14.11"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.23.0",
+    "@types/node": "^20.14.8",
+    "@types/react": "^19.0.6",
+    "eslint": "^9.23.0",
+    "eslint-config-next": "^15.1.7",
+    "eslint-plugin-react": "^7.37.4",
+    "globals": "^16.0.0",
+    "typescript": "5.5.4",
+    "typescript-eslint": "^8.27.0"
+  }
+}

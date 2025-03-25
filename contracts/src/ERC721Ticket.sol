@@ -169,25 +169,6 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
     }
 
     /**
-     * @dev Converts a specified amount of a token to its equivalent in ETH using the price feed.
-     * @param token The address of the token to convert.
-     * @param tokenAmount The amount of the token to convert.
-     * @return The equivalent amount in wei.
-     */
-    function convertTokenToETH(address token, uint256 tokenAmount) internal view returns (uint256) {
-        AggregatorV3Interface priceFeed = priceFeeds[token];
-        if (address(priceFeed) == address(0)) {
-            revert PriceFeedNotSet(token);
-        }
-
-        // Fetch the latest price from the Chainlink oracle
-        (, int256 price,,,) = priceFeed.latestRoundData();
-
-        // Convert token to ETH (assuming the token has 6 decimals)
-        return (tokenAmount * uint256(price)) / 1e6;
-    }
-
-    /**
      * @dev Converts the mint price from ETH to the equivalent amount in a specified token.
      * @param token The address of the token.
      * @return The equivalent amount in the specified token.
@@ -205,7 +186,7 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
         }
 
         // Supports only 6 decimal tokens
-        return (mintPrice * uint256(ethPrice) * 1e10) / 1e18; // Adjust for decimals
+        return (mintPrice * uint256(ethPrice) * 1e10) / 1e18;
     }
 
     /**

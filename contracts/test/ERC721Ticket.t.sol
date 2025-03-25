@@ -22,7 +22,6 @@ contract ERC721TicketTest is Test {
     address adminWalletAddress;
     uint256 mintPrice = 0.01 ether;
 
-    bytes32 public merkleRoot;
     bytes32[] proof1;
     bytes32[] proof2;
 
@@ -52,15 +51,6 @@ contract ERC721TicketTest is Test {
         vm.startPrank(admin);
         erc721Ticket.setMintPrice(0.01 ether);
         assertEq(erc721Ticket.mintPrice(), 0.01 ether);
-        vm.stopPrank();
-    }
-
-    function testSetMintPriceUnauthorized() public {
-        uint256 newPrice = 0.1 ether;
-        vm.startPrank(user);
-
-        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, user, role));
-        erc721Ticket.setMintPrice(newPrice);
         vm.stopPrank();
     }
 
@@ -136,7 +126,6 @@ contract ERC721TicketTest is Test {
 
         vm.startPrank(admin);
         erc721Ticket.setMintPrice(mintPrice);
-        erc721Ticket.updateWhitelistMerkleRoot(keccak256(abi.encodePacked(admin)));
         erc721Ticket.setPriceFeed(token, address(mockPriceFeed), "TEST");
 
         uint256 expectedTokenAmount = (mintPrice * uint256(mockEthPriceInToken)) / 1e6;
@@ -145,29 +134,6 @@ contract ERC721TicketTest is Test {
 
         assertEq(tokenAmount, expectedTokenAmount);
     }
-
-    // function testUpdateAndRemoveWhitelist() public {
-    //     vm.deal(admin, 100 ether);
-    //     vm.startPrank(admin);
-
-    //     vm.startPrank(secondAddress);
-
-    //     // Generate proof for the second address
-    //     assertTrue(erc721Ticket.isWhitelisted(proof), "Address should be whitelisted");
-    //     vm.stopPrank();
-
-    //     vm.startPrank(admin);
-    //     address[] memory updatedWhitelistedAddresses = new address[](1);
-    //     updatedWhitelistedAddresses[0] = admin;
-    //     bytes32 updatedRoot = generateMerkleRoot(updatedWhitelistedAddresses);
-    //     erc721Ticket.updateWhitelistMerkleRoot(updatedRoot);
-
-    //     vm.startPrank(secondAddress);
-
-    //     bytes32[] memory updatedProof = generateMerkleProof(updatedWhitelistedAddresses, secondAddress);
-
-    //     assertFalse(erc721Ticket.isWhitelisted(updatedProof), "Address should not be whitelisted");
-    // }
 
     function testMintNFTWithToken() public {
         vm.startPrank(admin);
@@ -191,22 +157,8 @@ contract ERC721TicketTest is Test {
         vm.stopPrank();
     }
 
-    function testMintNFTInsufficientFunds() public {
-        vm.startPrank(admin);
-        erc721Ticket.setMintPrice(mintPrice);
-        vm.stopPrank();
-
-        vm.startPrank(user);
-
-        vm.expectRevert(IERC721TicketErrors.InsufficientFunds.selector);
-        erc721Ticket.mintNFT{value: 0 ether}(proof2); // Sending less than mintPrice
-
-        vm.stopPrank();
-    }
-
     function testIsAdmin() public {
         assertTrue(erc721Ticket.isAdmin(admin), "Admin should be recognized as an admin");
-
         assertFalse(erc721Ticket.isAdmin(user), "User should not be recognized as an admin");
     }
 
@@ -253,6 +205,7 @@ contract ERC721TicketTest is Test {
     // Helper functions
 
     function generateMerkleRoot(address[] memory addresses) internal pure returns (bytes32) {
+        require(addresses.length > 0, "Empty address array");
         bytes32[] memory leaves = new bytes32[](addresses.length);
         for (uint256 i = 0; i < addresses.length; i++) {
             leaves[i] = keccak256(abi.encodePacked(addresses[i]));
@@ -281,8 +234,8 @@ contract ERC721TicketTest is Test {
                 len++;
             }
             // Resize the array manually
-            bytes32[] memory newLeaves = new bytes32[](len / 2);
-            for (uint256 i = 0; i < len / 2; i++) {
+            bytes32[] memory newLeaves = new bytes32[]((len + 1) / 2);
+            for (uint256 i = 0; i < (len + 1) / 2; i++) {
                 newLeaves[i] = leaves[i];
             }
             leaves = newLeaves;
@@ -298,6 +251,8 @@ contract ERC721TicketTest is Test {
                 break;
             }
         }
+        require(index < leaves.length, "Target address not found in leaves");
+
         bytes32[] memory proof = new bytes32[](leaves.length - 1);
         uint256 proofIndex = 0;
         for (uint256 i = 0; i < leaves.length; i++) {

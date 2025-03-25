@@ -29,12 +29,12 @@ contract ERC721TicketAuctionTest is Test {
         vm.startPrank(admin);
         vm.deal(admin, 100 ether);
         vm.deal(user1, 100 ether);
-        
+
         mockNFT = new MockNFT();
         adminWallet = new MockAdminWallet();
         adminWalletAddress = address(adminWallet);
         erc721TicketAuction = new ERC721TicketAuction(address(mockNFT));
-        
+
         mockNFT.mint();
         mockNFT.mint();
         vm.stopPrank();
@@ -100,7 +100,6 @@ contract ERC721TicketAuctionTest is Test {
         erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
         uint256 oldDuration = duration;
 
-
         vm.startPrank(user1);
         erc721TicketAuction.bid{value: 2 ether}(1);
 
@@ -156,13 +155,12 @@ contract ERC721TicketAuctionTest is Test {
         assertTrue(myBid.endTime > block.timestamp, "End time should be in the future");
     }
 
-
     function testGetMyBids() public {
         vm.startPrank(admin);
 
         mockNFT.approve(address(erc721TicketAuction), tokenId1);
         erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
-        
+
         mockNFT.approve(address(erc721TicketAuction), tokenId2);
         erc721TicketAuction.createAuction(tokenId2, reservePrice, duration);
 
@@ -180,16 +178,15 @@ contract ERC721TicketAuctionTest is Test {
         vm.stopPrank();
     }
 
-
     function testFinalizeAuction() public {
         uint256 tokenId = 2;
 
         vm.startPrank(adminWalletAddress);
         mockNFT.mint();
-        
+
         mockNFT.approve(address(erc721TicketAuction), tokenId);
         erc721TicketAuction.createAuction(tokenId, reservePrice, duration);
-        
+
         vm.stopPrank();
 
         vm.startPrank(user1);

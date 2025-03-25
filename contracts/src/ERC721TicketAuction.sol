@@ -27,7 +27,6 @@ contract ERC721TicketAuction is IERC721TicketAuction, IERC721TicketAuctionErrors
     function createAuction(uint256 tokenId, uint256 reservePrice, uint256 duration) external {
         if (reservePrice <= 0) revert ReservePriceMustBeGreaterThanZero();
 
-        // Transfer the NFT to the auction contract
         CONTRACT_ADDRESS.transferFrom(msg.sender, address(this), tokenId);
 
         auctionCount++;
@@ -57,11 +56,10 @@ contract ERC721TicketAuction is IERC721TicketAuction, IERC721TicketAuctionErrors
 
         // Refund the previous highest bidder if there is one
         if (auction.highestBidder != address(0)) {
-            uint256 previousBidAmount = auction.highestBidAmount; // Store previous highest bid
-            outbidded[auctionId][auction.highestBidder] += previousBidAmount; // Store previous highest bid
+            uint256 previousBidAmount = auction.highestBidAmount;
+            outbidded[auctionId][auction.highestBidder] += previousBidAmount;
         }
 
-        // Dynamic auction extension
         if (auction.endTime - block.timestamp < 2 minutes) {
             auction.endTime += 5 minutes;
         }
@@ -69,11 +67,9 @@ contract ERC721TicketAuction is IERC721TicketAuction, IERC721TicketAuctionErrors
         auction.highestBidder = msg.sender;
         auction.highestBidAmount = msg.value;
 
-        // Store bid information in the mappings
         bidsPerAddress[auctionId][msg.sender] = msg.value;
         auctionBidders[auctionId].push(msg.sender);
 
-        // Create a new bid entry regardless of existing bids
         Bid memory newBid = Bid({auctionId: auctionId, bidAmount: msg.value, endTime: auction.endTime});
         bids[msg.sender].push(newBid);
     }
@@ -91,6 +87,7 @@ contract ERC721TicketAuction is IERC721TicketAuction, IERC721TicketAuctionErrors
         if (auction.highestBidder != address(0)) {
             // Transfer funds to the seller
             payable(auction.seller).transfer(auction.highestBidAmount);
+
             // Transfer the NFT to the winner
             CONTRACT_ADDRESS.transferFrom(address(this), auction.highestBidder, auction.tokenId);
         } else {
@@ -153,8 +150,4 @@ contract ERC721TicketAuction is IERC721TicketAuction, IERC721TicketAuctionErrors
     function getMyBids() external view returns (Bid[] memory) {
         return bids[msg.sender];
     }
-
-    //   function supportsInterface(bytes4 interfaceId) public view override(ERC721, AccessControl) returns (bool) {
-    //     return super.supportsInterface(interfaceId);
-    // }
 }

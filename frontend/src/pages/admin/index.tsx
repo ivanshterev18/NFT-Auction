@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
@@ -122,13 +122,46 @@ const AdminPanel = () => {
     }
   }, [isAdmin, isConnected]);
 
+  const transactionStates = useMemo(
+    () => ({
+      ipfs: {
+        loading: isIpfsLoading,
+        success: isIpfsSuccess,
+        error: isIpfsError,
+      },
+      setPrice: {
+        loading: isSetPriceLoading,
+        success: isSetPriceSuccess,
+        error: isSetPriceError,
+      },
+      addCurrency: {
+        loading: isAddMintCurrencyLoading,
+        success: isAddMintCurrencySuccess,
+        error: isAddMintCurrencyError,
+      },
+    }),
+    [
+      isIpfsLoading,
+      isIpfsSuccess,
+      isIpfsError,
+      isSetPriceLoading,
+      isSetPriceSuccess,
+      isSetPriceError,
+      isAddMintCurrencyLoading,
+      isAddMintCurrencySuccess,
+      isAddMintCurrencyError,
+    ]
+  );
+
   useEffect(() => {
-    if (isIpfsLoading || isSetPriceLoading || isAddMintCurrencyLoading) {
+    const { ipfs, setPrice, addCurrency } = transactionStates;
+
+    if (ipfs.loading || setPrice.loading || addCurrency.loading) {
       toast.loading("Transaction pending...", { id: "ipfs" });
       return;
     }
 
-    if (isIpfsSuccess) {
+    if (ipfs.success) {
       setAddressToWhitelist("");
       setWhitelist(whitelistLastState);
       refreshIpfsUploadedData(whitelistLastState);
@@ -136,35 +169,25 @@ const AdminPanel = () => {
       return;
     }
 
-    if (isSetPriceSuccess) {
+    if (setPrice.success) {
       setNftMintPrice("");
       refetchMintPrice();
       toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
       return;
     }
 
-    if (isAddMintCurrencySuccess) {
+    if (addCurrency.success) {
       setTokenAddress("");
       setPriceAddress("");
       toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
       return;
     }
 
-    if (isIpfsError || isSetPriceError || isAddMintCurrencyError) {
+    if (ipfs.error || setPrice.error || addCurrency.error) {
       toast.error("Transaction failed! ❌", { id: "ipfs" });
       return;
     }
-  }, [
-    isIpfsSuccess,
-    isIpfsLoading,
-    isIpfsError,
-    isSetPriceLoading,
-    isSetPriceSuccess,
-    isSetPriceError,
-    isAddMintCurrencyLoading,
-    isAddMintCurrencySuccess,
-    isAddMintCurrencyError,
-  ]);
+  }, [transactionStates, whitelistLastState, refetchMintPrice]);
 
   return isConnected ? (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-800 p-6">

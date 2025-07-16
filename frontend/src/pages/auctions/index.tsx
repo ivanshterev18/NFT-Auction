@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   useAccount,
   useReadContract,
@@ -54,6 +54,18 @@ export default function Auctions() {
   const { auctions } = useAuctionContract({
     fetchAuctions: true,
   });
+
+  const formattedAuctions = useMemo(() => {
+    if (!auctions) return [];
+
+    return (auctions as IAuction[]).map((auction: IAuction) => ({
+      ...auction,
+      formattedHighestBid: auction.highestBidAmount
+        ? formatPriceInETH(auction.highestBidAmount.toString())
+        : "No bids yet",
+      formattedEndTime: auction.endTime ? Number(auction.endTime) : null,
+    }));
+  }, [auctions]);
 
   useEffect(() => {
     if (!address) {
@@ -217,9 +229,9 @@ export default function Auctions() {
       </div>
 
       <div className="mt-8">
-        <h2 className="text-2xl font-semibold">Live Auctions</h2>
+        <h2 className="text-2xl font-semibold">Auctions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-6 mt-4">
-          {(auctions as IAuction[])?.map((auction: IAuction) => (
+          {formattedAuctions?.map((auction: IAuction) => (
             <div
               key={auction.id}
               className="bg-gray-800 p-4 rounded shadow h-80 flex flex-col gap-2 h-88"

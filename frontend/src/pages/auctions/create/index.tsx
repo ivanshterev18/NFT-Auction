@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import BigNumber from "bignumber.js";
 import toast from "react-hot-toast";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import Loader from "../../../components/Loader";
 import {
   NFT_CONTRACT_ADDRESS,
   NFT_CONTRACT_ABI,
@@ -47,6 +48,30 @@ const CreateAuction = () => {
     hash: approveHash,
   });
 
+  // Combine all transaction states into a single memoized object
+  const transactionStates = useMemo(
+    () => ({
+      createAuction: {
+        loading: isCreateAuctionLoading,
+        success: isCreateAuctionSuccess,
+        error: isCreateAuctionError,
+      },
+      approve: {
+        loading: isApproveLoading,
+        success: isApproveSuccess,
+        error: isApproveError,
+      },
+    }),
+    [
+      isCreateAuctionLoading,
+      isCreateAuctionSuccess,
+      isCreateAuctionError,
+      isApproveLoading,
+      isApproveSuccess,
+      isApproveError,
+    ]
+  );
+
   const handleCreateAuction = () => {
     const selectedDateTime = Math.floor(new Date(endDate).getTime() / 1000);
     const currentTime = Math.floor(new Date().getTime() / 1000);
@@ -57,16 +82,26 @@ const CreateAuction = () => {
     }
 
     if (selectedNFT && selectedDateTime && startingPrice) {
-      writeCreateAuction({
-        address: AUCTION_CONTRACT_ADDRESS,
-        abi: AUCTION_CONTRACT_ABI,
-        functionName: "createAuction",
-        args: [
-          selectedNFT,
-          BigNumber(formatPriceInWei(startingPrice)),
-          BigNumber(selectedDateTime),
-        ],
-      });
+      const confirmed = window.confirm(
+        `Are you sure you want to create an auction for NFT #${Number(
+          selectedNFT
+        )}?\n\n` +
+          `Starting Price: ${startingPrice} ETH\n` +
+          `End Date: ${new Date(endDate).toLocaleString()}\n\n`
+      );
+
+      if (confirmed) {
+        writeCreateAuction({
+          address: AUCTION_CONTRACT_ADDRESS,
+          abi: AUCTION_CONTRACT_ABI,
+          functionName: "createAuction",
+          args: [
+            selectedNFT,
+            BigNumber(formatPriceInWei(startingPrice)),
+            BigNumber(selectedDateTime),
+          ],
+        });
+      }
     }
   };
 
@@ -80,35 +115,34 @@ const CreateAuction = () => {
   };
 
   useEffect(() => {
-    if (isCreateAuctionLoading || isApproveLoading) {
+    if (
+      transactionStates.createAuction.loading ||
+      transactionStates.approve.loading
+    ) {
       toast.loading("Transaction pending...", { id: "txn" });
       return;
     }
 
-    if (isApproveSuccess) {
+    if (transactionStates.approve.success) {
       refetchIsApproved();
       toast.success("Transaction confirmed! 🎉", { id: "txn" });
       return;
     }
 
-    if (isCreateAuctionSuccess) {
+    if (transactionStates.createAuction.success) {
       router.push("/auctions");
       toast.success("Transaction confirmed! 🎉", { id: "txn" });
       return;
     }
 
-    if (isCreateAuctionError || isApproveError) {
+    if (
+      transactionStates.createAuction.error ||
+      transactionStates.approve.error
+    ) {
       toast.error("Transaction failed! ❌", { id: "txn" });
       return;
     }
-  }, [
-    isCreateAuctionLoading,
-    isApproveLoading,
-    isApproveSuccess,
-    isCreateAuctionSuccess,
-    isApproveError,
-    isCreateAuctionError,
-  ]);
+  }, [transactionStates, router]);
 
   return (
     <div className="p-6 pt-16 w-1/2 mx-auto">
@@ -157,7 +191,13 @@ const CreateAuction = () => {
               : "cursor-pointer"
           }`}
         >
-          Create Auction
+          {isCreateAuctionLoading ? (
+            <div className="flex items-center justify-center">
+              <Loader />
+            </div>
+          ) : (
+            "Create Auction"
+          )}
         </button>
       ) : (
         <button
@@ -169,7 +209,13 @@ const CreateAuction = () => {
               : "cursor-pointer"
           }`}
         >
-          Approve NFT
+          {isApproveLoading ? (
+            <div className="flex items-center justify-center">
+              <Loader />
+            </div>
+          ) : (
+            "Approve NFT"
+          )}
         </button>
       )}
     </div>

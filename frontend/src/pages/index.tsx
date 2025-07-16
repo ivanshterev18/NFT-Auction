@@ -10,7 +10,7 @@ export default function Home() {
       <h1 className="text-4xl font-bold">Welcome to Our NFT Platform</h1>
       <p className="mt-2 text-lg text-gray-400">
         {isConnected
-          ? "Explore the live auctions below."
+          ? "Explore the auctions below."
           : "Connect your wallet to start using the app."}
       </p>
 

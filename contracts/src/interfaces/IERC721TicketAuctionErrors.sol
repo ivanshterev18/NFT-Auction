@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.30;
 
 interface IERC721TicketAuctionErrors {
-    error ReservePriceMustBeGreaterThanZero();
-    error EndTimeMustBeInTheFuture();
+    error InitialPriceMustBeGreaterThanZero();
     error AuctionHasEnded();
-    error BidMustBeHigherThanCurrentHighestBidAndReservePrice();
+    error DurationMustBeGreaterThanZero();
+    error AuctionNotEndedYet();
+    error BidMustBeHigherThanCurrentHighestBidAndInitialPrice();
     error CannotBidOnOwnAuction();
     error AuctionAlreadyFinalized();
     error NotTheSellerOfThisAuction();

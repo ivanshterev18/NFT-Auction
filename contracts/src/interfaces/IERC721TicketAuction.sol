@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.30;
 
 interface IERC721TicketAuction {
     struct Auction {
         address seller;
-        uint256 reservePrice;
+        uint256 initialPrice;
         uint256 highestBidAmount;
         address highestBidder;
         uint256 endTime;

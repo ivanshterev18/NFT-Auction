@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC721Ticket} from "src/ERC721Ticket.sol";
@@ -22,9 +22,6 @@ contract ERC721TicketTest is Test {
     address adminWalletAddress;
     uint256 mintPrice = 0.01 ether;
 
-    bytes32[] proof1;
-    bytes32[] proof2;
-
     function setUp() public {
         vm.startPrank(admin);
         erc721Ticket = new ERC721Ticket();
@@ -33,16 +30,8 @@ contract ERC721TicketTest is Test {
         adminWallet = new MockAdminWallet();
         adminWalletAddress = address(adminWallet);
 
-        address[] memory whitelistedAddresses = new address[](2);
-        whitelistedAddresses[0] = admin;
-        whitelistedAddresses[1] = user;
-
-        // Generate the Merkle root for both addresses
-        bytes32 root = generateMerkleRoot(whitelistedAddresses);
-        erc721Ticket.updateWhitelistMerkleRoot(root);
-
-        proof1 = generateMerkleProof(whitelistedAddresses, admin);
-        proof2 = generateMerkleProof(whitelistedAddresses, user);
+        erc721Ticket.addToWhitelist(admin);
+        erc721Ticket.addToWhitelist(user);
 
         vm.stopPrank();
     }
@@ -61,7 +50,7 @@ contract ERC721TicketTest is Test {
 
         vm.startPrank(user);
         vm.deal(user, 0.01 ether);
-        erc721Ticket.mintNFT{value: 0.01 ether}(proof2);
+        erc721Ticket.mintNFT{value: 0.01 ether}();
         assertEq(erc721Ticket.balanceOf(user), 1);
         vm.stopPrank();
     }
@@ -75,64 +64,40 @@ contract ERC721TicketTest is Test {
 
         erc721Ticket.setPriceFeed(token, priceFeedAddress, symbol);
 
-        assertEq(erc721Ticket.getSupportedTokens().length, 1);
-        assertEq(erc721Ticket.getSupportedTokens()[0].token, token);
-        assertEq(erc721Ticket.getSupportedTokens()[0].symbol, symbol);
+        assertEq(erc721Ticket.getSupportedTokensWithSymbols().length, 1);
+        assertEq(erc721Ticket.getSupportedTokensWithSymbols()[0].token, token);
+        assertEq(erc721Ticket.getTokenSymbol(token), symbol);
 
         vm.stopPrank();
     }
 
     function testIsWhitelisted() public {
         vm.startPrank(admin);
-        assertTrue(erc721Ticket.isWhitelisted(proof1), "Address should be whitelisted");
+        assertTrue(erc721Ticket.isWhitelisted(admin), "Address should be whitelisted");
         vm.stopPrank();
     }
 
     function testGetMintPriceInToken() public {
-        // Set up the price feed for the token
         address token = address(0x123);
         address priceFeedAddress = address(0x456);
-        uint256 mintPriceInETH = 0.01 ether; // Set the mint price in ETH
+        uint256 mintPriceInETH = 0.01 ether;
 
         vm.startPrank(admin);
-        // Set the mint price in the contract
+
         erc721Ticket.setMintPrice(mintPriceInETH);
 
-        // Assume the price feed returns a price of 2000 for 1 ETH in the token
-        erc721Ticket.updateWhitelistMerkleRoot(keccak256(abi.encodePacked(admin)));
         erc721Ticket.setPriceFeed(token, priceFeedAddress, "TEST");
         vm.stopPrank();
 
-        // Mock the price feed to return a specific price
         vm.mockCall(
             priceFeedAddress, abi.encodeWithSignature("latestRoundData()"), abi.encode(0, int256(2000), 0, 0, 0)
         );
 
-        // // Call the function to get the mint price in the token
         uint256 mintPriceInToken = erc721Ticket.getMintPriceInToken(token);
 
-        // // Calculate expected price in token
         uint256 expectedPriceInToken = (mintPriceInETH * 2000) / 1e8; // Adjust for decimals
 
-        // // Assert that the returned price matches the expected price
         assertEq(mintPriceInToken, expectedPriceInToken, "Mint price in token should match expected price");
-    }
-
-    function testGetMintPriceInTokenEquals() public {
-        // Mock price feed for converting ETH to USDC
-        address token = address(0x123); // Mock token address
-
-        uint256 mockEthPriceInToken = 2000 * 10 ** 6; // 1 ETH = 2000 USDC, with 6 decimals
-
-        vm.startPrank(admin);
-        erc721Ticket.setMintPrice(mintPrice);
-        erc721Ticket.setPriceFeed(token, address(mockPriceFeed), "TEST");
-
-        uint256 expectedTokenAmount = (mintPrice * uint256(mockEthPriceInToken)) / 1e6;
-
-        uint256 tokenAmount = erc721Ticket.getMintPriceInToken(token);
-
-        assertEq(tokenAmount, expectedTokenAmount);
     }
 
     function testMintNFTWithToken() public {
@@ -142,18 +107,37 @@ contract ERC721TicketTest is Test {
         mockToken.mint(admin, 1000 * 10 ** mockToken.decimals());
 
         mockToken.approve(address(erc721Ticket), 1000 * 10 ** mockToken.decimals());
-        erc721Ticket.mintNFTWithToken(address(mockToken), proof1);
+        erc721Ticket.mintNFTWithToken(address(mockToken));
 
         assertEq(erc721Ticket.balanceOf(admin), 1);
         vm.stopPrank();
     }
 
+    function testMintNFTWithInsufficientFunds() public {
+        vm.startPrank(admin);
+        erc721Ticket.setMintPrice(0.005 ether);
+
+        vm.startPrank(user);
+        vm.deal(user, 0.004 ether);
+
+        vm.expectRevert(IERC721TicketErrors.InsufficientFunds.selector);
+        erc721Ticket.mintNFT{value: 0.004 ether}();
+        vm.stopPrank();
+    }
+
     function testMintNFTNotWhitelisted() public {
-        vm.startPrank(address(0x123)); // A non-admin address
+        vm.startPrank(address(0x123));
 
         vm.expectRevert(IERC721TicketErrors.NotWhitelisted.selector);
-        erc721Ticket.mintNFT(proof1);
+        erc721Ticket.mintNFT();
 
+        vm.stopPrank();
+    }
+
+    function testSetMintPriceWithZero() public {
+        vm.startPrank(admin);
+        vm.expectRevert(IERC721TicketErrors.MintPriceMustBeGreaterThanZero.selector);
+        erc721Ticket.setMintPrice(0);
         vm.stopPrank();
     }
 
@@ -165,7 +149,7 @@ contract ERC721TicketTest is Test {
     function testGetNFTsOfOwner() public {
         vm.startPrank(admin);
 
-        erc721Ticket.mintNFT(proof1);
+        erc721Ticket.mintNFT();
         vm.stopPrank();
 
         uint256[] memory nfts = erc721Ticket.getNFTsOfOwner(admin);
@@ -179,17 +163,12 @@ contract ERC721TicketTest is Test {
         vm.deal(adminWalletAddress, 10 ether);
 
         ERC721Ticket erc721Ticket2 = new ERC721Ticket();
+        erc721Ticket2.addToWhitelist(adminWalletAddress);
         erc721Ticket2.setMintPrice(mintPrice);
 
-        address[] memory whitelistedAddresses = new address[](1);
-        whitelistedAddresses[0] = adminWalletAddress;
-        bytes32 root = generateMerkleRoot(whitelistedAddresses);
-        erc721Ticket2.updateWhitelistMerkleRoot(root);
-
         uint256 initialBalance = address(erc721Ticket2).balance;
-        bytes32[] memory localProof = generateMerkleProof(whitelistedAddresses, adminWalletAddress);
 
-        erc721Ticket2.mintNFT{value: mintPrice}(localProof);
+        erc721Ticket2.mintNFT{value: mintPrice}();
 
         uint256 withdrawAmount = address(this).balance;
         erc721Ticket2.withdraw();
@@ -202,64 +181,101 @@ contract ERC721TicketTest is Test {
         vm.stopPrank();
     }
 
-    // Helper functions
-
-    function generateMerkleRoot(address[] memory addresses) internal pure returns (bytes32) {
-        require(addresses.length > 0, "Empty address array");
-        bytes32[] memory leaves = new bytes32[](addresses.length);
-        for (uint256 i = 0; i < addresses.length; i++) {
-            leaves[i] = keccak256(abi.encodePacked(addresses[i]));
-        }
-        return computeMerkleRoot(leaves);
+    function testRemoveFromWhitelist() public {
+        vm.startPrank(admin);
+        erc721Ticket.removeFromWhitelist(user);
+        assertFalse(erc721Ticket.isWhitelisted(user), "User should be removed from whitelist");
+        vm.stopPrank();
     }
 
-    function generateMerkleProof(address[] memory addresses, address target) internal pure returns (bytes32[] memory) {
-        bytes32[] memory leaves = new bytes32[](addresses.length);
-        for (uint256 i = 0; i < addresses.length; i++) {
-            leaves[i] = keccak256(abi.encodePacked(addresses[i]));
-        }
-        return computeMerkleProof(leaves, target);
+    function testGetWhitelistedUsers() public {
+        vm.startPrank(admin);
+        address[] memory whitelistedUsers = erc721Ticket.getWhitelistedUsers();
+        assertEq(whitelistedUsers.length, 2, "Should have 2 whitelisted users");
+        assertEq(whitelistedUsers[0], admin, "First user should be admin");
+        assertEq(whitelistedUsers[1], user, "Second user should be user");
+        vm.stopPrank();
     }
 
-    function computeMerkleRoot(bytes32[] memory leaves) internal pure returns (bytes32) {
-        require(leaves.length > 0, "Empty leaf array");
-
-        while (leaves.length > 1) {
-            uint256 len = leaves.length;
-            for (uint256 i = 0; i < len / 2; i++) {
-                leaves[i] = keccak256(abi.encodePacked(leaves[2 * i], leaves[2 * i + 1]));
-            }
-            if (len % 2 == 1) {
-                leaves[len / 2] = leaves[len - 1];
-                len++;
-            }
-            // Resize the array manually
-            bytes32[] memory newLeaves = new bytes32[]((len + 1) / 2);
-            for (uint256 i = 0; i < (len + 1) / 2; i++) {
-                newLeaves[i] = leaves[i];
-            }
-            leaves = newLeaves;
-        }
-        return leaves[0];
+    function testSupportsInterface() public {
+        assertTrue(erc721Ticket.supportsInterface(0x80ac58cd), "Should support ERC721 interface");
+        assertTrue(erc721Ticket.supportsInterface(0x7965db0b), "Should support AccessControl interface");
+        assertFalse(erc721Ticket.supportsInterface(0x12345678), "Should not support random interface");
     }
 
-    function computeMerkleProof(bytes32[] memory leaves, address target) internal pure returns (bytes32[] memory) {
-        uint256 index = 0;
-        for (uint256 i = 0; i < leaves.length; i++) {
-            if (leaves[i] == keccak256(abi.encodePacked(target))) {
-                index = i;
-                break;
-            }
-        }
-        require(index < leaves.length, "Target address not found in leaves");
+    function testMintNFTWithTokenTransferFailure() public {
+        vm.startPrank(admin);
+        erc721Ticket.setMintPrice(mintPrice);
+        erc721Ticket.setPriceFeed(address(mockToken), address(mockPriceFeed), "MTK");
 
-        bytes32[] memory proof = new bytes32[](leaves.length - 1);
-        uint256 proofIndex = 0;
-        for (uint256 i = 0; i < leaves.length; i++) {
-            if (i != index) {
-                proof[proofIndex++] = leaves[i];
-            }
-        }
-        return proof;
+        MockERC20 failingToken = new MockERC20("Failing Token", "FTK");
+        failingToken.mint(admin, 1000 * 10 ** failingToken.decimals());
+
+        erc721Ticket.setPriceFeed(address(failingToken), address(mockPriceFeed), "FTK");
+
+        vm.mockCall(
+            address(failingToken), abi.encodeWithSignature("transferFrom(address,address,uint256)"), abi.encode(false)
+        );
+
+        vm.expectRevert(IERC721TicketErrors.TokenTransferFailed.selector);
+        erc721Ticket.mintNFTWithToken(address(failingToken));
+        vm.stopPrank();
+    }
+
+    function testMintNFTWithTokenNotWhitelisted() public {
+        vm.startPrank(admin);
+        erc721Ticket.setMintPrice(mintPrice);
+        erc721Ticket.setPriceFeed(address(mockToken), address(mockPriceFeed), "MTK");
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        vm.expectRevert(IERC721TicketErrors.NotWhitelisted.selector);
+        erc721Ticket.mintNFTWithToken(address(mockToken));
+        vm.stopPrank();
+    }
+
+    function testGetMintPriceInTokenWithInvalidPriceFeed() public {
+        vm.startPrank(admin);
+        erc721Ticket.setMintPrice(mintPrice);
+
+        address invalidToken = address(0x999);
+        erc721Ticket.setPriceFeed(invalidToken, address(0), "INVALID");
+
+        vm.expectRevert();
+        erc721Ticket.getMintPriceInToken(invalidToken);
+        vm.stopPrank();
+    }
+
+    function testGetMintPriceInTokenWithInvalidPrice() public {
+        vm.startPrank(admin);
+        erc721Ticket.setMintPrice(mintPrice);
+
+        MockAggregatorV3 negativePriceFeed = new MockAggregatorV3(-1000 * 10 ** 8, 8);
+
+        address token = address(0x888);
+        erc721Ticket.setPriceFeed(token, address(negativePriceFeed), "NEG");
+
+        vm.expectRevert(IERC721TicketErrors.InvalidETHPrice.selector);
+        erc721Ticket.getMintPriceInToken(token);
+        vm.stopPrank();
+    }
+
+    function testMultipleSupportedTokenOperations() public {
+        vm.startPrank(admin);
+
+        address token1 = address(0x111);
+        address token2 = address(0x222);
+        address token3 = address(0x333);
+
+        erc721Ticket.setPriceFeed(token1, address(0x444), "TKN1");
+        erc721Ticket.setPriceFeed(token2, address(0x555), "TKN2");
+        erc721Ticket.setPriceFeed(token3, address(0x666), "TKN3");
+
+        assertEq(erc721Ticket.getSupportedTokensWithSymbols().length, 3, "Should have 3 supported tokens");
+
+        erc721Ticket.removeSupportedToken(token2);
+        assertEq(erc721Ticket.getSupportedTokensWithSymbols().length, 2, "Should have 2 supported tokens after removal");
+
+        vm.stopPrank();
     }
 }

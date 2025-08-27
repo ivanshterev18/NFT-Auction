@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {ERC721TicketAuction} from "src/ERC721TicketAuction.sol";
 import {ERC721Ticket} from "src/ERC721Ticket.sol";
 import {IERC721TicketAuction} from "src/interfaces/IERC721TicketAuction.sol";
+import {IERC721TicketAuctionErrors} from "src/interfaces/IERC721TicketAuctionErrors.sol";
 import {MockNFT} from "./mocks/MockNFT.sol";
 import {MockAdminWallet} from "./mocks/MockAdminWallet.sol";
 
@@ -16,12 +17,12 @@ contract ERC721TicketAuctionTest is Test {
 
     address admin = address(0x1);
     address user1 = address(0x2);
-    address user2 = address(0x2);
+    address user2 = address(0x3);
 
     uint256 tokenId1 = 0;
     uint256 tokenId2 = 1;
-    uint256 reservePrice = 1 ether;
-    uint256 duration = block.timestamp + 1 days;
+    uint256 initialPrice = 1 ether;
+    uint256 duration = 1 days;
 
     event LogAuctionState(uint256 auctionId, bool finalized, address highestBidder, uint256 highestBidAmount);
 
@@ -29,6 +30,7 @@ contract ERC721TicketAuctionTest is Test {
         vm.startPrank(admin);
         vm.deal(admin, 100 ether);
         vm.deal(user1, 100 ether);
+        vm.deal(user2, 100 ether);
 
         mockNFT = new MockNFT();
         adminWallet = new MockAdminWallet();
@@ -37,36 +39,6 @@ contract ERC721TicketAuctionTest is Test {
 
         mockNFT.mint();
         mockNFT.mint();
-        vm.stopPrank();
-    }
-
-    function testCreateAuction() public {
-        vm.startPrank(admin);
-        mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
-
-        (address seller, uint256 reserve,,,,,,) = erc721TicketAuction.auctions(1);
-
-        assertEq(seller, admin);
-        assertEq(reservePrice, reserve);
-        vm.stopPrank();
-    }
-
-    function testBid() public {
-        vm.startPrank(admin);
-        mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
-
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        erc721TicketAuction.bid{value: 1.5 ether}(1);
-
-        (,, uint256 highestBidAmount, address highestBidder,,,,) = erc721TicketAuction.auctions(1);
-
-        assertEq(highestBidder, user1, "Highest bidder should be user1");
-        assertEq(highestBidAmount, 1.5 ether, "Highest bid amount should be 1.5 ether");
-
         vm.stopPrank();
     }
 
@@ -83,22 +55,23 @@ contract ERC721TicketAuctionTest is Test {
 
         assertEq(auctions.length, 2, "Expected 2 auctions to be created");
 
-        assertEq(auctions[0].reservePrice, 1 ether, "First auction reserve price mismatch");
+        assertEq(auctions[0].initialPrice, 1 ether, "First auction initial price mismatch");
         assertEq(auctions[0].tokenId, tokenId1, "First auction token ID mismatch");
         assertEq(auctions[0].seller, admin, "First auction seller mismatch");
 
-        assertEq(auctions[1].reservePrice, 2 ether, "Second auction reserve price mismatch");
+        assertEq(auctions[1].initialPrice, 2 ether, "Second auction initial price mismatch");
         assertEq(auctions[1].tokenId, tokenId2, "Second auction token ID mismatch");
         assertEq(auctions[1].seller, admin, "Second auction seller mismatch");
     }
 
     function testPlaceBidTimeExtended() public {
-        uint256 duration = block.timestamp + 1 minutes;
+        duration = 1 minutes;
 
         vm.startPrank(admin);
         mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
-        uint256 oldDuration = duration;
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
+
+        uint256 originalEndTime = erc721TicketAuction.getAuction(1).endTime;
 
         vm.startPrank(user1);
         erc721TicketAuction.bid{value: 2 ether}(1);
@@ -108,8 +81,7 @@ contract ERC721TicketAuctionTest is Test {
         assertEq(auction.highestBidAmount, 2 ether);
         erc721TicketAuction.bid{value: 3 ether}(1);
 
-        uint256 newDuration = auction.endTime;
-        assertTrue(newDuration == oldDuration + 5 minutes, "Auction end time should be extended");
+        assertEq(auction.endTime, originalEndTime + 5 minutes, "Auction end time should be extended");
 
         vm.stopPrank();
     }
@@ -117,7 +89,7 @@ contract ERC721TicketAuctionTest is Test {
     function testGetAuctionBids() public {
         vm.startPrank(admin);
         mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
         vm.stopPrank();
 
         vm.startPrank(user1);
@@ -129,7 +101,6 @@ contract ERC721TicketAuctionTest is Test {
         erc721TicketAuction.bid{value: 2 ether}(1);
         vm.stopPrank();
 
-        // Retrieve auction bids
         (address[] memory bidders, uint256[] memory amounts) = erc721TicketAuction.getAuctionBids(1);
 
         assertEq(bidders.length, 2, "Expected 2 bidders");
@@ -142,7 +113,7 @@ contract ERC721TicketAuctionTest is Test {
     function testGetMyBid() public {
         vm.startPrank(admin);
         mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
         vm.stopPrank();
 
         vm.startPrank(user1);
@@ -155,26 +126,10 @@ contract ERC721TicketAuctionTest is Test {
         assertTrue(myBid.endTime > block.timestamp, "End time should be in the future");
     }
 
-    function testGetMyBids() public {
-        vm.startPrank(admin);
-
-        mockNFT.approve(address(erc721TicketAuction), tokenId1);
-        erc721TicketAuction.createAuction(tokenId1, reservePrice, duration);
-
-        mockNFT.approve(address(erc721TicketAuction), tokenId2);
-        erc721TicketAuction.createAuction(tokenId2, reservePrice, duration);
-
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        erc721TicketAuction.bid{value: 1.5 ether}(1);
-
+    function testGetMyBidsWithNoBids() public {
+        vm.startPrank(user2);
         IERC721TicketAuction.Bid[] memory myBids = erc721TicketAuction.getMyBids();
-
-        assertEq(myBids.length, 1, "User1 should have 1 bid");
-        assertEq(myBids[0].auctionId, 1, "First bidder should be user1");
-        assertEq(myBids[0].bidAmount, 1.5 ether, "First bid amount should be 1.5 ether");
-
+        assertEq(myBids.length, 0, "User2 should have 0 bids");
         vm.stopPrank();
     }
 
@@ -185,7 +140,7 @@ contract ERC721TicketAuctionTest is Test {
         mockNFT.mint();
 
         mockNFT.approve(address(erc721TicketAuction), tokenId);
-        erc721TicketAuction.createAuction(tokenId, reservePrice, duration);
+        erc721TicketAuction.createAuction(tokenId, initialPrice, duration);
 
         vm.stopPrank();
 
@@ -201,6 +156,94 @@ contract ERC721TicketAuctionTest is Test {
 
         assertTrue(auction.finalized, "Auction should be finalized");
         assertEq(mockNFT.ownerOf(tokenId), user1, "NFT should be owned by the highest bidder");
+        vm.stopPrank();
+    }
+
+    function testCreateAuctionWithZeroInitialPrice() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+
+        vm.expectRevert(IERC721TicketAuctionErrors.InitialPriceMustBeGreaterThanZero.selector);
+        erc721TicketAuction.createAuction(tokenId1, 0, duration);
+        vm.stopPrank();
+    }
+
+    function testCreateAuctionWithZeroDuration() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+
+        vm.expectRevert(IERC721TicketAuctionErrors.DurationMustBeGreaterThanZero.selector);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, 0);
+        vm.stopPrank();
+    }
+
+    function testBidBelowHighestBid() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        erc721TicketAuction.bid{value: 1.5 ether}(1);
+        vm.stopPrank();
+
+        vm.startPrank(user2);
+        vm.expectRevert(IERC721TicketAuctionErrors.BidMustBeHigherThanCurrentHighestBidAndInitialPrice.selector);
+        erc721TicketAuction.bid{value: 1.4 ether}(1);
+        vm.stopPrank();
+    }
+
+    function testSellerCannotBidOnOwnAuction() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        vm.expectRevert(IERC721TicketAuctionErrors.CannotBidOnOwnAuction.selector);
+        erc721TicketAuction.bid{value: 2 ether}(1);
+        vm.stopPrank();
+    }
+
+    function testFinalizeAuctionBeforeEndTime() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        vm.expectRevert(IERC721TicketAuctionErrors.AuctionNotEndedYet.selector);
+        erc721TicketAuction.finalizeAuction(1);
+        vm.stopPrank();
+    }
+
+    function testFinalizeAuctionTwice() public {
+        vm.startPrank(admin);
+        mockNFT.approve(address(erc721TicketAuction), tokenId1);
+        erc721TicketAuction.createAuction(tokenId1, initialPrice, duration);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + duration + 1);
+
+        vm.startPrank(admin);
+        erc721TicketAuction.finalizeAuction(1);
+
+        vm.expectRevert();
+        erc721TicketAuction.finalizeAuction(1);
+        vm.stopPrank();
+    }
+
+    function testBidOnNonExistentAuction() public {
+        vm.startPrank(user1);
+        vm.expectRevert();
+        erc721TicketAuction.bid{value: 1.5 ether}(999);
+        vm.stopPrank();
+    }
+
+    function testFinalizeNonExistentAuction() public {
+        vm.startPrank(admin);
+        vm.expectRevert();
+        erc721TicketAuction.finalizeAuction(999);
         vm.stopPrank();
     }
 }

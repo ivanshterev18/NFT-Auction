@@ -1,25 +1,33 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.26;
+pragma solidity 0.8.30;
 
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721Ticket} from "src/interfaces/IERC721Ticket.sol";
 import {IERC721TicketErrors} from "src/interfaces/IERC721TicketErrors.sol";
 
-contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErrors {
-    SupportedToken[] public supportedTokens;
+contract ERC721Ticket is ERC721, AccessControl, ReentrancyGuard, IERC721Ticket, IERC721TicketErrors {
+    mapping(address => SupportedToken) public supportedTokens;
     mapping(address => AggregatorV3Interface) public priceFeeds;
-    uint256 public mintPrice;
+    mapping(address => bool) public whitelistedUsers;
 
+    uint256 public mintPrice;
     uint256 private _nftCounter;
-    bytes32 private merkleRoot;
+    address[] private whitelistedAddresses;
+    address[] private supportedTokenAddresses;
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
+    event MintPriceUpdated(uint256 newPrice);
+    event SupportedTokenAdded(address indexed token, address indexed priceFeedAddress, string symbol);
+    event SupportedTokenRemoved(address indexed token);
+    event FundsWithdrawn(address indexed admin);
+
     constructor() ERC721("NFTicket", "NT") {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
         _nftCounter = 0;
     }
@@ -29,7 +37,11 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
      * @param newPrice The new mint price in wei.
      */
     function setMintPrice(uint256 newPrice) external onlyRole(ADMIN_ROLE) {
+        if (newPrice <= 0) {
+            revert MintPriceMustBeGreaterThanZero();
+        }
         mintPrice = newPrice;
+        emit MintPriceUpdated(newPrice);
     }
 
     /**
@@ -45,26 +57,69 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
         priceFeeds[token] = AggregatorV3Interface(priceFeedAddress);
 
         // Add token to supportedTokens if it's not already present
-        if (!isTokenSupported(token)) {
-            supportedTokens.push(SupportedToken(token, symbol));
+        if (supportedTokens[token].token == address(0)) {
+            supportedTokens[token] = SupportedToken(token, symbol);
+            supportedTokenAddresses.push(token);
+        }
+
+        emit SupportedTokenAdded(token, priceFeedAddress, symbol);
+    }
+
+    /**
+     * @dev Adds a user to the whitelist.
+     * @param user The address of the user to add to the whitelist.
+     */
+    function addToWhitelist(address user) external onlyRole(ADMIN_ROLE) {
+        if (!whitelistedUsers[user]) {
+            whitelistedUsers[user] = true;
+            whitelistedAddresses.push(user);
         }
     }
 
     /**
-     * @dev Updates the Merkle root for the whitelist.
-     * @param _newRoot The new Merkle root.
+     * @dev Removes a user from the whitelist.
+     * @param user The address of the user to remove from the whitelist.
      */
-    function updateWhitelistMerkleRoot(bytes32 _newRoot) external onlyRole(ADMIN_ROLE) {
-        merkleRoot = _newRoot;
+    function removeFromWhitelist(address user) external onlyRole(ADMIN_ROLE) {
+        if (whitelistedUsers[user]) {
+            whitelistedUsers[user] = false;
+
+            for (uint256 i = 0; i < whitelistedAddresses.length; i++) {
+                if (whitelistedAddresses[i] == user) {
+                    whitelistedAddresses[i] = whitelistedAddresses[whitelistedAddresses.length - 1];
+                    whitelistedAddresses.pop();
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * @dev Removes a token from the supported tokens list.
+     * @param token The address of the token to remove.
+     */
+    function removeSupportedToken(address token) external onlyRole(ADMIN_ROLE) {
+        if (supportedTokens[token].token != address(0)) {
+            delete supportedTokens[token];
+            delete priceFeeds[token];
+
+            for (uint256 i = 0; i < supportedTokenAddresses.length; i++) {
+                if (supportedTokenAddresses[i] == token) {
+                    supportedTokenAddresses[i] = supportedTokenAddresses[supportedTokenAddresses.length - 1];
+                    supportedTokenAddresses.pop();
+                    break;
+                }
+            }
+        }
+
+        emit SupportedTokenRemoved(token);
     }
 
     /**
      * @dev Mints an NFT for the sender if they are whitelisted and have sent enough ETH.
-     * @param _proof The Merkle proof for verification.
      */
-    function mintNFT(bytes32[] calldata _proof) external payable {
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        if (!MerkleProof.verify(_proof, merkleRoot, leaf)) {
+    function mintNFT() external payable {
+        if (!whitelistedUsers[msg.sender]) {
             revert NotWhitelisted();
         }
         if (msg.value < mintPrice) {
@@ -77,39 +132,46 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
     /**
      * @dev Mints an NFT for the sender using a specified token if they are whitelisted.
      * @param token The address of the token to use for payment.
-     * @param _proof The Merkle proof for verification.
      */
-    function mintNFTWithToken(address token, bytes32[] calldata _proof) external {
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        if (!MerkleProof.verify(_proof, merkleRoot, leaf)) {
+    function mintNFTWithToken(address token) external nonReentrant {
+        if (!whitelistedUsers[msg.sender]) {
             revert NotWhitelisted();
         }
 
         // Convert the mint price from ETH to the equivalent amount in the specified token
         uint256 tokenAmountRequired = convertETHToToken(token);
-        if (!IERC20(token).transferFrom(msg.sender, address(this), tokenAmountRequired)) {
-            revert TokenTransferFailed();
-        }
 
         _safeMint(msg.sender, _nftCounter);
         _nftCounter++;
+
+        if (!IERC20(token).transferFrom(msg.sender, address(this), tokenAmountRequired)) {
+            revert TokenTransferFailed();
+        }
     }
 
     /**
      * @dev Withdraws the contract's balance to the admin's address.
      */
-    function withdraw() external onlyRole(ADMIN_ROLE) {
+    function withdraw() external onlyRole(ADMIN_ROLE) nonReentrant {
         payable(msg.sender).transfer(address(this).balance);
+        emit FundsWithdrawn(msg.sender);
     }
 
     /**
-     * @dev Checks if an address is whitelisted using a Merkle proof.
-     * @param _proof The Merkle proof for verification.
+     * @dev Gets the list of whitelisted users.
+     * @return An array of whitelisted users.
+     */
+    function getWhitelistedUsers() external view onlyRole(ADMIN_ROLE) returns (address[] memory) {
+        return whitelistedAddresses;
+    }
+
+    /**
+     * @dev Checks if an address is whitelisted.
+     * @param user The address to check.
      * @return True if the address is whitelisted, false otherwise.
      */
-    function isWhitelisted(bytes32[] calldata _proof) external view returns (bool) {
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
-        return MerkleProof.verify(_proof, merkleRoot, leaf);
+    function isWhitelisted(address user) external view returns (bool) {
+        return whitelistedUsers[user];
     }
 
     /**
@@ -122,11 +184,23 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
     }
 
     /**
-     * @dev Gets the list of supported tokens.
-     * @return An array of supported tokens.
+     * @dev Gets the list of supported tokens with their addresses and symbols.
+     * @return An array of SupportedToken structs containing address and symbol.
      */
-    function getSupportedTokens() external view returns (SupportedToken[] memory) {
-        return supportedTokens;
+    function getSupportedTokensWithSymbols() external view returns (SupportedToken[] memory) {
+        uint256 length = supportedTokenAddresses.length;
+        SupportedToken[] memory tokens = new SupportedToken[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            address tokenAddress = supportedTokenAddresses[i];
+            tokens[i] = supportedTokens[tokenAddress];
+        }
+
+        return tokens;
+    }
+
+    function getTokenSymbol(address token) external view returns (string memory) {
+        return supportedTokens[token].symbol;
     }
 
     /**
@@ -187,19 +261,5 @@ contract ERC721Ticket is ERC721, AccessControl, IERC721Ticket, IERC721TicketErro
 
         // Supports only 6 decimal tokens
         return (mintPrice * uint256(ethPrice) * 1e10) / 1e18;
-    }
-
-    /**
-     * @dev Checks if a token is supported.
-     * @param token The address of the token.
-     * @return True if the token is supported, false otherwise.
-     */
-    function isTokenSupported(address token) internal view returns (bool) {
-        for (uint256 i = 0; i < supportedTokens.length; i++) {
-            if (supportedTokens[i].token == token) {
-                return true;
-            }
-        }
-        return false;
     }
 }

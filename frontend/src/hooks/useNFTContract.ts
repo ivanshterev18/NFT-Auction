@@ -63,14 +63,15 @@ export const useNFTContract = (
       })
     : { data: null };
 
-  const { data: whitelistedUsers, refetch: refetchWhitelistedUsers } = options?.fetchWhitelistedUsers
-    ? useReadContract({
-        address: nftContract.address,
-        abi: nftContract.abi,
-        functionName: "getWhitelistedUsers",
-        account: address,
-      })
-    : { data: null };
+  const { data: whitelistedUsers, refetch: refetchWhitelistedUsers } =
+    options?.fetchWhitelistedUsers
+      ? useReadContract({
+          address: nftContract.address,
+          abi: nftContract.abi,
+          functionName: "getWhitelistedUsers",
+          account: address,
+        })
+      : { data: null, refetch: () => {} };
 
   const { data: supportedTokens } = options?.fetchSupportedTokens
     ? useReadContract({

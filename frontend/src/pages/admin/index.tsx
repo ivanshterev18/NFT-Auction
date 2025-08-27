@@ -10,21 +10,26 @@ import {
 } from "wagmi";
 import { NFT_CONTRACT_ADDRESS, NFT_CONTRACT_ABI } from "../../utils/constants";
 import { formatPriceInETH, formatPriceInWei } from "../../utils/format";
-import { generateMerkleRoot } from "../../utils/merkle";
-import { useWeb3Store } from "../../stores/useWeb3Store";
 import { useNFTContract } from "../../hooks/useNFTContract";
-import { refreshIpfsUploadedData } from "../../config/pinata";
 
 const AdminPanel = () => {
   const router = useRouter();
   const { isConnected } = useAccount();
 
-  const { mintPrice, refetchMintPrice, isAdmin, isAdminLoading } =
-    useNFTContract({ fetchIsAdmin: true, fetchMintPrice: true });
+  const {
+    mintPrice,
+    refetchMintPrice,
+    isAdmin,
+    isAdminLoading,
+    whitelistedUsers,
+    refetchWhitelistedUsers,
+  } = useNFTContract({
+    fetchIsAdmin: true,
+    fetchMintPrice: true,
+    fetchWhitelistedUsers: true,
+  });
 
-  const { whitelist, setWhitelist } = useWeb3Store((state) => state);
   const [addressToWhitelist, setAddressToWhitelist] = useState("");
-  const [whitelistLastState, setWhitelistLastState] = useState<string[]>([]);
 
   const [nftMintPrice, setNftMintPrice] = useState("");
 
@@ -44,16 +49,17 @@ const AdminPanel = () => {
     hash: setPriceHash,
   });
 
-  // Upload to IPFS
-  const { writeContract: uploadToIpfs, data: ipfsHash } = useWriteContract();
+  // Add to Whitelist
+  const { writeContract: addToWhitelist, data: addToWhitelistHash } =
+    useWriteContract();
 
-  // Wait for IPFS transaction receipt
+  // Wait for Add to Whitelist transaction receipt
   const {
-    isLoading: isIpfsLoading,
-    isSuccess: isIpfsSuccess,
-    isError: isIpfsError,
+    isLoading: isAddToWhitelistLoading,
+    isSuccess: isAddToWhitelistSuccess,
+    isError: isAddToWhitelistError,
   } = useWaitForTransactionReceipt({
-    hash: ipfsHash,
+    hash: addToWhitelistHash,
   });
 
   // Add Mint Currency
@@ -88,31 +94,20 @@ const AdminPanel = () => {
   };
 
   const handleAddToWhitelist = () => {
-    const updatedWhitelist = [...whitelist, addressToWhitelist];
-    setWhitelistLastState(updatedWhitelist);
-
-    const newRoot = generateMerkleRoot(updatedWhitelist);
-
-    uploadToIpfs({
+    addToWhitelist({
       address: NFT_CONTRACT_ADDRESS,
       abi: NFT_CONTRACT_ABI,
-      functionName: "updateWhitelistMerkleRoot",
-      args: [newRoot],
+      functionName: "addToWhitelist",
+      args: [addressToWhitelist],
     });
   };
 
   const handleRemoveAddress = (addressToRemove: string) => {
-    const updatedWhitelist = whitelist.filter(
-      (addr: string) => addr !== addressToRemove
-    );
-    setWhitelistLastState(updatedWhitelist);
-    const newRoot = generateMerkleRoot(updatedWhitelist);
-
-    uploadToIpfs({
+    addToWhitelist({
       address: NFT_CONTRACT_ADDRESS,
       abi: NFT_CONTRACT_ABI,
-      functionName: "updateWhitelistMerkleRoot",
-      args: [newRoot],
+      functionName: "removeFromWhitelist",
+      args: [addressToRemove],
     });
   };
 
@@ -124,10 +119,10 @@ const AdminPanel = () => {
 
   const transactionStates = useMemo(
     () => ({
-      ipfs: {
-        loading: isIpfsLoading,
-        success: isIpfsSuccess,
-        error: isIpfsError,
+      addToWhitelist: {
+        loading: isAddToWhitelistLoading,
+        success: isAddToWhitelistSuccess,
+        error: isAddToWhitelistError,
       },
       setPrice: {
         loading: isSetPriceLoading,
@@ -141,9 +136,9 @@ const AdminPanel = () => {
       },
     }),
     [
-      isIpfsLoading,
-      isIpfsSuccess,
-      isIpfsError,
+      isAddToWhitelistLoading,
+      isAddToWhitelistSuccess,
+      isAddToWhitelistError,
       isSetPriceLoading,
       isSetPriceSuccess,
       isSetPriceError,
@@ -154,40 +149,43 @@ const AdminPanel = () => {
   );
 
   useEffect(() => {
-    const { ipfs, setPrice, addCurrency } = transactionStates;
+    const { addToWhitelist, setPrice, addCurrency } = transactionStates;
 
-    if (ipfs.loading || setPrice.loading || addCurrency.loading) {
-      toast.loading("Transaction pending...", { id: "ipfs" });
+    if (addToWhitelist.loading || setPrice.loading || addCurrency.loading) {
+      toast.loading("Transaction pending...", { id: "txn" });
       return;
     }
 
-    if (ipfs.success) {
+    if (addToWhitelist.success) {
+      toast.dismiss("txn");
       setAddressToWhitelist("");
-      setWhitelist(whitelistLastState);
-      refreshIpfsUploadedData(whitelistLastState);
-      toast.success("Whitelist updated! 🎉", { id: "ipfs" });
+      refetchWhitelistedUsers?.();
+      toast.success("Whitelist updated! 🎉", { id: "whitelist" });
       return;
     }
 
     if (setPrice.success) {
+      toast.dismiss("txn");
       setNftMintPrice("");
       refetchMintPrice();
-      toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
+      toast.success("Transaction confirmed! 🎉", { id: "setPrice" });
       return;
     }
 
     if (addCurrency.success) {
+      toast.dismiss("txn");
       setTokenAddress("");
       setPriceAddress("");
-      toast.success("Transaction confirmed! 🎉", { id: "ipfs" });
+      toast.success("Transaction confirmed! 🎉", { id: "addCurrency" });
       return;
     }
 
-    if (ipfs.error || setPrice.error || addCurrency.error) {
-      toast.error("Transaction failed! ❌", { id: "ipfs" });
+    if (addToWhitelist.error || setPrice.error || addCurrency.error) {
+      toast.dismiss("txn");
+      toast.error("Transaction failed! ❌", { id: "failed" });
       return;
     }
-  }, [transactionStates, whitelistLastState, refetchMintPrice]);
+  }, [transactionStates, refetchMintPrice]);
 
   return isConnected ? (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-black to-gray-800 p-6">
@@ -231,7 +229,7 @@ const AdminPanel = () => {
 
         {/* Whitelist Management */}
         <div className="mb-8">
-          <label className="block mb-2 text-lg text-gray-300">
+          <label className="block mt-2   mb-2 text-lg text-gray-300">
             Add Address to Whitelist:
           </label>
           <input
@@ -263,9 +261,9 @@ const AdminPanel = () => {
             Whitelisted Addresses:
           </h3>
           <div className="bg-gray-800 bg-opacity-75 p-4 rounded-lg border border-gray-700">
-            {(whitelist as string[])?.length > 0 ? (
+            {(whitelistedUsers as string[])?.length > 0 ? (
               <ul className="space-y-3">
-                {(whitelist as string[])?.map((addr, index) => (
+                {(whitelistedUsers as string[])?.map((addr, index) => (
                   <div
                     className="flex items-center justify-between"
                     key={index}

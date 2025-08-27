@@ -5,7 +5,7 @@ export interface IAuction {
   highestBidAmount: bigint;
   highestBidder: string;
   nftContract: string;
-  reservePrice: bigint;
+  initialPrice: bigint;
   seller: string;
   tokenId: bigint;
 }

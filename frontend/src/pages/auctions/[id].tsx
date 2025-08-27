@@ -125,7 +125,7 @@ export default function AuctionPage() {
             </p>
             <p className="text-gray-100 font-semibold">
               Starting Price:{" "}
-              {formatPriceInETH(auction?.reservePrice.toString())} ETH
+              {formatPriceInETH(auction?.initialPrice.toString())} ETH
             </p>
             <p className="text-gray-100">
               Current Highest Bid:{" "}

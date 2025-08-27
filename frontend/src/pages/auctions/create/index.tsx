@@ -75,19 +75,22 @@ const CreateAuction = () => {
   const handleCreateAuction = () => {
     const selectedDateTime = Math.floor(new Date(endDate).getTime() / 1000);
     const currentTime = Math.floor(new Date().getTime() / 1000);
+    const durationInSeconds = selectedDateTime - currentTime;
 
-    if (selectedDateTime < currentTime) {
+    if (durationInSeconds <= 0) {
       toast.error("End date and time must be in the future.");
       return;
     }
 
-    if (selectedNFT && selectedDateTime && startingPrice) {
+    if (selectedNFT && durationInSeconds && startingPrice) {
       const confirmed = window.confirm(
         `Are you sure you want to create an auction for NFT #${Number(
           selectedNFT
         )}?\n\n` +
           `Starting Price: ${startingPrice} ETH\n` +
-          `End Date: ${new Date(endDate).toLocaleString()}\n\n`
+          `Duration: ${Math.floor(durationInSeconds / 3600)} hours ${Math.floor(
+            (durationInSeconds % 3600) / 60
+          )} minutes\n\n`
       );
 
       if (confirmed) {
@@ -98,7 +101,7 @@ const CreateAuction = () => {
           args: [
             selectedNFT,
             BigNumber(formatPriceInWei(startingPrice)),
-            BigNumber(selectedDateTime),
+            durationInSeconds,
           ],
         });
       }

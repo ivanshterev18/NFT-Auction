@@ -19,8 +19,6 @@ import { formatPriceInETH, formatPriceInWei } from "../../utils/format";
 import toast from "react-hot-toast";
 import Link from "next/link";
 import Image from "next/image";
-import { generateMerkleProof } from "../../utils/merkle";
-import { useWeb3Store } from "../../stores/useWeb3Store";
 import { useNFTContract } from "../../hooks/useNFTContract";
 import { useAuctionContract } from "../../hooks/useAuctionContract";
 import { IAuction, SupportedTokens } from "../../utils/types";
@@ -29,7 +27,6 @@ import { TimerComponent } from "../../components/TimerComponent";
 export default function Auctions() {
   const router = useRouter();
   const { address } = useAccount();
-  const whitelist = useWeb3Store((state) => state.whitelist);
   const [selectedToken, setSelectedToken] = useState<SupportedTokens>({
     symbol: "ETH",
     token: "",
@@ -101,18 +98,14 @@ export default function Auctions() {
         address: NFT_CONTRACT_ADDRESS,
         abi: NFT_CONTRACT_ABI,
         functionName: "mintNFT",
-        args: [generateMerkleProof(address as string, whitelist)],
-        value: BigInt(formatPriceInWei(formatPriceInETH(mintPrice as string))),
+        value: mintPrice as bigint,
       });
     } else {
       writeContract({
         address: NFT_CONTRACT_ADDRESS,
         abi: NFT_CONTRACT_ABI,
         functionName: "mintNFTWithToken",
-        args: [
-          USDC_CONTRACT_ADDRESS,
-          generateMerkleProof(address as string, whitelist),
-        ],
+        args: [USDC_CONTRACT_ADDRESS, address],
       });
     }
   };
@@ -140,6 +133,9 @@ export default function Auctions() {
     abi: ERC20_CONTRACT_ABI,
     functionName: "allowance",
     args: [address, NFT_CONTRACT_ADDRESS],
+    query: {
+      enabled: selectedToken.symbol !== "ETH" && !!selectedToken.token,
+    },
   });
 
   useEffect(() => {

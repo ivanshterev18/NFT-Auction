@@ -1,7 +1,5 @@
 import { useAccount, useReadContract } from "wagmi";
 import { auctionContract, nftContract } from "../contracts/contracts";
-import { generateMerkleProof } from "../utils/merkle";
-import { useWeb3Store } from "../stores/useWeb3Store";
 
 export const useNFTContract = (
   options?: {
@@ -13,11 +11,11 @@ export const useNFTContract = (
     fetchSupportedTokens?: boolean;
     fetchMintPriceInToken?: boolean;
     fetchNFTsOfOwner?: boolean;
+    fetchWhitelistedUsers?: boolean;
   },
   tokenAddress?: string
 ) => {
   const { address } = useAccount();
-  const whitelist = useWeb3Store((state) => state.whitelist);
 
   const { data: mintPrice, refetch: refetchMintPrice } = options?.fetchMintPrice
     ? useReadContract({
@@ -60,7 +58,16 @@ export const useNFTContract = (
         address: nftContract.address,
         abi: nftContract.abi,
         functionName: "isWhitelisted",
-        args: [generateMerkleProof((address as string) || "", whitelist)],
+        args: [address],
+        account: address,
+      })
+    : { data: null };
+
+  const { data: whitelistedUsers, refetch: refetchWhitelistedUsers } = options?.fetchWhitelistedUsers
+    ? useReadContract({
+        address: nftContract.address,
+        abi: nftContract.abi,
+        functionName: "getWhitelistedUsers",
         account: address,
       })
     : { data: null };
@@ -69,7 +76,7 @@ export const useNFTContract = (
     ? useReadContract({
         address: nftContract.address,
         abi: nftContract.abi,
-        functionName: "getSupportedTokens",
+        functionName: "getSupportedTokensWithSymbols",
       })
     : { data: null };
 
@@ -102,6 +109,8 @@ export const useNFTContract = (
     isApproved,
     refetchIsApproved,
     isWhitelisted,
+    whitelistedUsers,
+    refetchWhitelistedUsers,
     supportedTokens,
   };
 };
